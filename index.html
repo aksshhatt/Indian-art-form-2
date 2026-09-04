@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interactive Art Map of India</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--paper:#f8f2e8;--ink:#241b17;--red:#8d352d;--gold:#cc9a3c;--teal:#2f6863;--muted:#74685f}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:var(--paper);color:var(--ink)}
+body{display:grid;grid-template-rows:auto 1fr}
+header{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 22px;border-bottom:1px solid #dfd4c5;background:#fbf6ee;z-index:5}
+.brand{font-weight:950;letter-spacing:.08em}.brand span{color:var(--red)}
+.subtitle{font-size:.86rem;color:var(--muted);text-align:right}
+.app{display:grid;grid-template-columns:360px 1fr;min-height:0}
+.sidebar{padding:22px;overflow:auto;border-right:1px solid #dfd4c5;background:#fffaf2}
+.kicker{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--red);font-weight:900}
+h1{font:700 2.4rem/1 Georgia;margin:8px 0 12px}
+.intro{color:var(--muted);line-height:1.65;font-size:.94rem}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0}
+.filters button{border:1px solid #dbcdb9;background:white;padding:8px 11px;border-radius:999px;font-weight:800;cursor:pointer;color:var(--ink)}
+.filters button.active{background:var(--ink);color:white}
+.location-list{display:grid;gap:10px;margin-top:18px}
+.loc{padding:13px;border:1px solid #e1d6c7;background:white;border-radius:16px;cursor:pointer;transition:.2s}
+.loc:hover{transform:translateY(-2px);box-shadow:0 10px 20px #0001}
+.loc .name{font-weight:900}.loc .meta{font-size:.78rem;color:var(--muted);margin-top:4px}
+#map{width:100%;height:100%}
+.leaflet-popup-content-wrapper{border-radius:18px}.leaflet-popup-content{margin:16px;min-width:240px}
+.popup h3{font:700 1.3rem Georgia;margin:0 0 6px}.popup p{font-size:.88rem;line-height:1.5;color:#665b53}
+.tag{display:inline-block;padding:5px 8px;margin:3px 3px 0 0;border-radius:999px;background:#efe1c8;color:#694d36;font-size:.7rem;font-weight:900}
+.legend{position:absolute;right:18px;bottom:18px;z-index:500;background:#fffaf2;padding:11px 13px;border-radius:14px;box-shadow:0 8px 22px #0002;font-size:.76rem}
+.legend b{display:block;margin-bottom:5px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red);margin-right:6px}
+@media(max-width:800px){body{display:block}.app{grid-template-columns:1fr;grid-template-rows:auto 70vh}.sidebar{border-right:0;border-bottom:1px solid #ddd}.subtitle{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">INDIAN <span>ART</span> MAP</div>
+  <div class="subtitle">Interactive Art Map (10 Marks) · CO1</div>
+</header>
+<div class="app">
+  <aside class="sidebar">
+    <div class="kicker">Geographic Art History Explorer</div>
+    <h1>Where Indian art happened</h1>
+    <p class="intro">Select a location from the map or list to discover important art movements, monuments, artists and traditions connected to that region.</p>
+    <div class="filters">
+      <button class="active" data-filter="all">All</button>
+      <button data-filter="ancient">Ancient</button>
+      <button data-filter="medieval">Medieval</button>
+      <button data-filter="early-modern">Early Modern</button>
+      <button data-filter="modern">Modern</button>
+      <button data-filter="folk">Folk</button>
+    </div>
+    <div class="location-list" id="locationList"></div>
+  </aside>
+  <main style="position:relative">
+    <div id="map"></div>
+    <div class="legend"><b>Explore the map</b><span class="dot"></span>Click a pin for art-history context</div>
+  </main>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const places=[
+{city:"Ajanta",state:"Maharashtra",lat:20.5519,lng:75.7033,era:"ancient",title:"Ajanta Caves",style:"Buddhist murals & rock-cut art",text:"Ajanta is renowned for rock-cut Buddhist caves decorated with paintings and sculpture. The murals are among the great surviving achievements of ancient Indian painting, depicting Jataka stories, courtly life and devotional themes.",tags:["Buddhist Art","Murals","Rock-cut Architecture"]},
+{city:"Sanchi",state:"Madhya Pradesh",lat:23.4793,lng:77.7394,era:"ancient",title:"Sanchi Stupa",style:"Mauryan–Shunga Buddhist art",text:"Sanchi preserves major Buddhist monuments including the Great Stupa and richly carved gateways. Its relief sculpture offers a key view of early Buddhist narrative art and symbolism.",tags:["Stupa","Mauryan","Relief Sculpture"]},
+{city:"Khajuraho",state:"Madhya Pradesh",lat:24.8318,lng:79.9199,era:"medieval",title:"Khajuraho Temples",style:"Chandela temple sculpture",text:"The Khajuraho temple group is famous for complex architectural planning and highly expressive stone sculpture. Sacred, courtly, everyday and erotic imagery appears across temple surfaces.",tags:["Temple Art","Chandela","Stone Sculpture"]},
+{city:"Thanjavur",state:"Tamil Nadu",lat:10.7870,lng:79.1378,era:"medieval",title:"Thanjavur",style:"Chola bronzes & temple art",text:"Thanjavur is central to the artistic legacy of the Cholas. Monumental temples and refined bronze icons, especially forms of Shiva such as Nataraja, represent a peak of South Indian sacred art.",tags:["Chola","Bronze","Temple Architecture"]},
+{city:"Hampi",state:"Karnataka",lat:15.3350,lng:76.4600,era:"medieval",title:"Hampi",style:"Vijayanagara architecture",text:"Hampi was the capital of the Vijayanagara Empire. Its temples, bazaars, gateways and royal structures reveal a powerful synthesis of Dravidian architecture, sculpture and urban design.",tags:["Vijayanagara","Architecture","Sculpture"]},
+{city:"Jaipur",state:"Rajasthan",lat:26.9124,lng:75.7873,era:"early-modern",title:"Jaipur",style:"Rajput painting & decorative arts",text:"Jaipur became an important center of Rajput court culture, miniature painting, manuscript production, textiles, jewelry and decorative arts. Regional workshops created distinctive visual identities.",tags:["Rajput","Miniature Painting","Decorative Arts"]},
+{city:"Agra",state:"Uttar Pradesh",lat:27.1767,lng:78.0081,era:"early-modern",title:"Agra",style:"Mughal imperial art",text:"Agra was a major center of Mughal architecture and courtly production. Monumental architecture, pietra dura, manuscript illustration and imperial patronage shaped its artistic identity.",tags:["Mughal","Architecture","Court Art"]},
+{city:"Puri",state:"Odisha",lat:19.8135,lng:85.8312,era:"folk",title:"Puri",style:"Pattachitra painting",text:"Puri is strongly associated with Pattachitra, a traditional painting practice on prepared cloth or palm leaf. Themes often center on Jagannath, Krishna and other devotional narratives.",tags:["Pattachitra","Folk Art","Devotional Painting"]},
+{city:"Madhubani",state:"Bihar",lat:26.3537,lng:86.0712,era:"folk",title:"Madhubani",style:"Mithila painting",text:"Madhubani is associated with Mithila painting, known for dense pattern, strong outlines, symbolic motifs and themes drawn from ritual, nature and mythology.",tags:["Mithila","Folk Painting","Ritual Art"]},
+{city:"Kolkata",state:"West Bengal",lat:22.5726,lng:88.3639,era:"modern",title:"Kolkata",style:"Bengal School & modern Indian art",text:"Kolkata was a major center of the Bengal School and modern Indian art. Artists such as Abanindranath Tagore helped develop new approaches that challenged colonial academic realism.",tags:["Bengal School","Modern Art","Nationalism"]},
+{city:"Santiniketan",state:"West Bengal",lat:23.6800,lng:87.6800,era:"modern",title:"Santiniketan",style:"Kala Bhavana & contextual modernism",text:"Santiniketan became an influential center of art education through Kala Bhavana. Artists including Nandalal Bose and Benode Behari Mukherjee explored modern Indian art through nature, craft and mural practice.",tags:["Kala Bhavana","Modernism","Art Education"]},
+{city:"New Delhi",state:"Delhi",lat:28.6139,lng:77.2090,era:"modern",title:"New Delhi",style:"National institutions & contemporary art",text:"Delhi became a major hub for museums, galleries, national academies and contemporary practice. It connects historical collections with modern and contemporary Indian art.",tags:["Museums","Contemporary Art","Institutions"]}
+];
+
+const map=L.map('map',{zoomControl:true}).setView([22.8,79.2],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+
+const markers=[];
+const list=document.getElementById('locationList');
+
+function popupHTML(p){
+ return `<div class="popup"><div style="font-size:.69rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#8d352d">${p.state}</div><h3>${p.title}</h3><div style="font-weight:800;font-size:.82rem">${p.style}</div><p>${p.text}</p>${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>`;
+}
+
+places.forEach((p,i)=>{
+ const m=L.marker([p.lat,p.lng]).addTo(map).bindPopup(popupHTML(p));
+ m.data=p; markers.push(m);
+ const el=document.createElement('div');
+ el.className='loc'; el.dataset.era=p.era;
+ el.innerHTML=`<div class="name">${p.city}, ${p.state}</div><div class="meta">${p.style}</div>`;
+ el.onclick=()=>{map.setView([p.lat,p.lng],7,{animate:true});m.openPopup()};
+ list.appendChild(el);
+});
+
+document.querySelectorAll('.filters button').forEach(btn=>{
+ btn.onclick=()=>{
+  document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const f=btn.dataset.filter;
+  document.querySelectorAll('.loc').forEach((el,i)=>{
+    const show=f==='all'||places[i].era===f;
+    el.style.display=show?'block':'none';
+    if(show && !map.hasLayer(markers[i])) markers[i].addTo(map);
+    if(!show && map.hasLayer(markers[i])) map.removeLayer(markers[i]);
+  });
+ };
+});
+</script>
+</body>
+</html>
